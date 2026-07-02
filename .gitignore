@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# C extensions
+*.so
+
+# Environments
+.env
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Logs
+*.log
+agent_bridge.log
+backend/agent_bridge.log
+
+# System / IDEs / Build / Package managers
+.system_generated/
+.idea/
+.vscode/
+node_modules/
+dist/
+build/
+
+# Database files
+*.db
+backend/*.db
+
+# Generated reports / PDF artifacts
+*.pdf
+backend/*.pdf
+
