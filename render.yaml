@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: agentbridge-backend
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: NVIDIA_API_KEY
+        sync: false # User will supply this in the Render dashboard
+      - key: GEMINI_API_KEY
+        sync: false # User will supply this in the Render dashboard

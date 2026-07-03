@@ -1,8 +1,8 @@
 # AgentBridge — Multi-Agent Global Career & Migration Planner
 
-> **Note**: This project is a working prototype built as part of the **Kaggle 5-Day AI Agents Capstone**. It is designed to demonstrate multi-agent orchestration, PII redaction security guards, database grounding, and pathway simulation.
+> **Note**: This project is a working prototype built as part of the **Kaggle 5-Day AI Agents Capstone**. It is designed to demonstrate multi-agent orchestration, local PII redaction security guards, SQLite database grounding, and career pathway simulation.
 
-AgentBridge is a prototype planning dashboard designed for students and professionals looking to transition their career to international destinations. It processes user academic and professional goals, extracts profile metrics, performs grounded database matching across exactly five target countries, and models career progression outcomes comparing stay-in-home-country versus migration options.
+AgentBridge is a prototype planning dashboard designed for students and professionals looking to transition their career to international destinations. It processes user academic/professional profiles, extracts metrics, performs grounded database matching across exactly five target countries, and models career progression outcomes comparing home country vs. migration options.
 
 ---
 
@@ -55,6 +55,7 @@ AgentBridge/
 ├── Stop AgentBridge.bat     # Windows script to stop uvicorn server running on port 8000
 │
 ├── backend/                 # Backend FastAPI application
+│   ├── .env.example         # Example environment configuration file
 │   ├── agents.py            # AI agent pipeline using Google ADK & NVIDIA NIM
 │   ├── database.py          # SQLite database connection, schema setup, and auto-seeding
 │   ├── main.py              # FastAPI endpoints, CORS, static mounting, and uvicorn runner
@@ -76,10 +77,17 @@ AgentBridge/
 ## ⚙️ Installation & Setup
 
 ### 1. Clone the Repository
-Place the repository files inside your workspace directory.
+```bash
+git clone https://github.com/divyanshkumar333/AgentBridge-Multi-Agent-Global-Career-Migration-Planner.git
+cd AgentBridge-Multi-Agent-Global-Career-Migration-Planner
+```
 
 ### 2. Configure the Environment
-Create a `.env` file in the `backend/` directory with the following variables:
+Copy the example environment file inside the `backend/` directory:
+```bash
+cp backend/.env.example backend/.env
+```
+Open `backend/.env` and add your API keys:
 ```env
 NVIDIA_API_KEY=your_nvidia_nim_api_key_here
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -101,7 +109,7 @@ To run manually, navigate to the `backend/` directory:
    python -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
-2. Install python packages:
+2. Install Python packages:
    ```bash
    pip install -r requirements.txt
    ```
@@ -129,6 +137,33 @@ Here are placeholders for screenshots of the running application interface:
 
 * **Blueprint Dashboard**: Tabbed interface displaying the target career profile analysis, country comparison tables, scholarship listings, and a generated milestone timeline.
   ![Blueprint Dashboard Screen](docs/screenshots/blueprint_dashboard.png)
+
+
+---
+
+## 🌐 Deployment
+
+This prototype is prepared for cloud deployment, splitting the static frontend and the FastAPI backend.
+
+### 1. Backend (FastAPI on Render)
+1. Sign in to [Render](https://render.com/) and create a new **Web Service**.
+2. Connect your GitHub repository.
+3. Configure the following build settings:
+   - **Environment**: `Python`
+   - **Build Command**: `pip install -r backend/requirements.txt`
+   - **Start Command**: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+4. Add your **Environment Variables** in the Render settings panel:
+   - `NVIDIA_API_KEY`: *your_nvidia_api_key*
+   - `GEMINI_API_KEY`: *your_gemini_api_key*
+5. Once deployed, note down the provided Render service URL (e.g. `https://agentbridge-backend.onrender.com`).
+
+### 2. Frontend (Static on Vercel)
+1. Sign in to [Vercel](https://vercel.com/) and import your repository.
+2. Edit the root `vercel.json` file on GitHub or locally, and update the destination URL of the `/api/:path*` rewrite to point to your actual Render backend URL:
+   ```json
+   "destination": "https://<your-render-backend-url>/api/:path*"
+   ```
+3. Deploy the project. Vercel will serve the static files inside the `frontend` folder and securely proxy all `/api` calls to your Render backend, avoiding CORS configuration issues.
 
 ---
 

@@ -1,3 +1,7 @@
+// API configuration: Set this to your backend service URL (e.g., "https://agentbridge-backend.onrender.com") when deploying on static hosts like GitHub Pages
+// If left empty, it will default to relative URLs (useful for local development and Vercel deployments).
+const API_BASE = "";
+
 document.addEventListener("DOMContentLoaded", () => {
     // Initialize Lucide Icons
     lucide.createIcons();
@@ -223,7 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
             let apiData = null;
             let apiError = null;
 
-            const apiPromise = fetch("/api/analyze", {
+            const apiPromise = fetch(`${API_BASE}/api/analyze`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -393,7 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
             downloadReportBtn.innerHTML = `<span class="spinner" style="width:14px;height:14px;border-width:2px;margin-bottom:0;display:inline-block;vertical-align:middle;margin-right:6px;"></span> Exporting PDF...`;
             lucide.createIcons();
 
-            const response = await fetch("/api/report/download", {
+            const response = await fetch(`${API_BASE}/api/report/download`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -440,7 +444,7 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
         
         try {
-            const response = await fetch("/api/simulate", {
+            const response = await fetch(`${API_BASE}/api/simulate`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
