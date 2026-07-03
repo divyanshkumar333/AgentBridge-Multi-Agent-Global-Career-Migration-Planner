@@ -13,6 +13,9 @@ Because GitHub does not host dynamic runtime backends (like FastAPI/Python), we 
 ## 🛠️ Step 1: Deploy the Backend on Render (Free Tier)
 Render offers a free tier for web services and integrates seamlessly with GitHub.
 
+> [!IMPORTANT]
+> Choose **Web Service** instead of **Blueprint**. Render requires a credit card on file to set up Blueprints, but manual **Web Service** setup is 100% free and does not require any payment information.
+
 1. Sign in to the [Render Dashboard](https://dashboard.render.com/) (you can log in using your GitHub account).
 2. Click **New +** and select **Web Service**.
 3. Connect your GitHub repository.
