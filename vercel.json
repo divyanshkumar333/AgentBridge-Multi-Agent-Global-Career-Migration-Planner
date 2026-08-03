@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://agentbridge-multi-agent-global-career-1x7e.onrender.com/api/:path*"
+      "destination": "https://agentbridge-multi-agent-global-career-2x7e.onrender.com/:path*"
     },
     {
       "source": "/(.*)",
