@@ -161,6 +161,8 @@ class MatchedCountry(BaseModel):
     visa_complexity: str = Field(description="Visa complexity rating: Low, Medium, or High.")
     language_barrier: str = Field(description="Language barrier level: Low, Medium, or High.")
     risk_level: str = Field(description="Overall risk level: Low, Medium, or High.")
+    positive_factors: List[str] = Field(description="List of 2-3 positive factors or pros for this country.")
+    drawbacks: List[str] = Field(description="List of 2-3 drawbacks or cons for this country.")
 
 class ExplorerResult(BaseModel):
 
@@ -270,7 +272,7 @@ get_scholarships_tool = FunctionTool(func=get_scholarships_db)
 # ==========================================
 
 # Model to use across agents
-MODEL_NAME = "meta/llama-3.1-8b-instruct"
+MODEL_NAME = "meta/llama-3.2-90b-vision-instruct"
 
 # Agent 1: Profiler
 profiler_agent = Agent(
@@ -299,7 +301,8 @@ explorer_agent = Agent(
         "2. For each of the five countries, evaluate the compatibility with the candidate's target role, language skills, and visa goals, and assign a match score (1-100).\n"
         "3. Extract and present the official study/work visa pathways, post-study work durations, and risk factors for each from the database.\n"
         "4. For each country, determine the visa complexity (Low, Medium, or High), language barrier level (Low, Medium, or High), and overall risk level (Low, Medium, or High) based on database details.\n"
-        "5. Your output must contain exactly five items in `matched_countries`, representing JP, DE, CA, AU, and NL.\n"
+        "5. Extract 2-3 positive factors (pros) and 2-3 drawbacks (cons) for each country based on the data and profile match.\n"
+        "6. Your output must contain exactly five items in `matched_countries`, representing JP, DE, CA, AU, and NL.\n"
         "Ground your answers in the database; do not invent visa requirements, language barriers, or housing risks.\n"
         "Ensure your output strictly conforms to the ExplorerResult schema."
     ),
@@ -348,11 +351,11 @@ def get_profile_fallback(resume_text: str, degree_level: str) -> dict:
 def get_explorer_fallback() -> dict:
     return {
         "matched_countries": [
-            {"country_code": "JP", "country_name": "Japan", "match_score": 60, "match_reason": "High demand for tech, but high language barrier.", "visa_route": "Student Visa", "visa_process_summary": "Apply to school, get COE, apply for visa.", "post_study_work_months": 12, "risk_analysis": "Language barrier.", "visa_complexity": "Medium", "language_barrier": "High", "risk_level": "Medium"},
-            {"country_code": "DE", "country_name": "Germany", "match_score": 80, "match_reason": "Strong engineering market and affordable education.", "visa_route": "Student Visa", "visa_process_summary": "Apply to university, open blocked account, apply at embassy.", "post_study_work_months": 18, "risk_analysis": "Bureaucracy and language barrier.", "visa_complexity": "Medium", "language_barrier": "High", "risk_level": "Medium"},
-            {"country_code": "CA", "country_name": "Canada", "match_score": 75, "match_reason": "Open post-graduation work opportunities.", "visa_route": "Study Permit", "visa_process_summary": "Get admission, pay tuition, apply for study permit online.", "post_study_work_months": 36, "risk_analysis": "Housing shortage and high cost of living.", "visa_complexity": "Medium", "language_barrier": "Low", "risk_level": "Medium"},
-            {"country_code": "AU", "country_name": "Australia", "match_score": 70, "match_reason": "Good post-study work options.", "visa_route": "Student Visa (Subclass 500)", "visa_process_summary": "Get CoE, purchase health cover, apply online.", "post_study_work_months": 24, "risk_analysis": "High cost of living.", "visa_complexity": "Medium", "language_barrier": "Low", "risk_level": "Medium"},
-            {"country_code": "NL", "country_name": "Netherlands", "match_score": 65, "match_reason": "English-friendly environment.", "visa_route": "Student Visa (MVV/VVR)", "visa_process_summary": "University applies on student's behalf.", "post_study_work_months": 12, "risk_analysis": "Severe student housing shortage.", "visa_complexity": "Low", "language_barrier": "Medium", "risk_level": "Medium"}
+            {"country_code": "JP", "country_name": "Japan", "match_score": 60, "match_reason": "High demand for tech, but high language barrier.", "visa_route": "Student Visa", "visa_process_summary": "Apply to school, get COE, apply for visa.", "post_study_work_months": 12, "risk_analysis": "Language barrier.", "visa_complexity": "Medium", "language_barrier": "High", "risk_level": "Medium", "positive_factors": ["High tech demand", "Safe environment"], "drawbacks": ["High language barrier", "Rigid work culture"]},
+            {"country_code": "DE", "country_name": "Germany", "match_score": 80, "match_reason": "Strong engineering market and affordable education.", "visa_route": "Student Visa", "visa_process_summary": "Apply to university, open blocked account, apply at embassy.", "post_study_work_months": 18, "risk_analysis": "Bureaucracy and language barrier.", "visa_complexity": "Medium", "language_barrier": "High", "risk_level": "Medium", "positive_factors": ["Affordable education", "Strong engineering market"], "drawbacks": ["Bureaucracy", "Language barrier"]},
+            {"country_code": "CA", "country_name": "Canada", "match_score": 75, "match_reason": "Open post-graduation work opportunities.", "visa_route": "Study Permit", "visa_process_summary": "Get admission, pay tuition, apply for study permit online.", "post_study_work_months": 36, "risk_analysis": "Housing shortage and high cost of living.", "visa_complexity": "Medium", "language_barrier": "Low", "risk_level": "Medium", "positive_factors": ["Open post-grad work", "Immigration friendly"], "drawbacks": ["High cost of living", "Housing shortage"]},
+            {"country_code": "AU", "country_name": "Australia", "match_score": 70, "match_reason": "Good post-study work options.", "visa_route": "Student Visa (Subclass 500)", "visa_process_summary": "Get CoE, purchase health cover, apply online.", "post_study_work_months": 24, "risk_analysis": "High cost of living.", "visa_complexity": "Medium", "language_barrier": "Low", "risk_level": "Medium", "positive_factors": ["High minimum wage", "Good work options"], "drawbacks": ["High cost of living", "Strict visa rules"]},
+            {"country_code": "NL", "country_name": "Netherlands", "match_score": 65, "match_reason": "English-friendly environment.", "visa_route": "Student Visa (MVV/VVR)", "visa_process_summary": "University applies on student's behalf.", "post_study_work_months": 12, "risk_analysis": "Severe student housing shortage.", "visa_complexity": "Low", "language_barrier": "Medium", "risk_level": "Medium", "positive_factors": ["English-friendly", "Tech hub"], "drawbacks": ["Severe housing shortage", "High taxes"]}
         ]
     }
 
@@ -393,7 +396,7 @@ async def run_agent_pipeline(resume_text: str, goals: str, degree_level: str) ->
     client = OpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
         api_key=os.environ.get("NVIDIA_API_KEY"),
-        timeout=30.0
+        timeout=60.0
     )
     logger.info("NVIDIA client initialized with 30s timeout")
 
@@ -903,3 +906,39 @@ async def run_agent_pipeline(resume_text: str, goals: str, degree_level: str) ->
     logger.info("Data normalization complete.")
     logger.info("====================================")
     return {"profile": profile_data, "explorer": explorer_data, "funding": funding_data}
+
+async def run_chat_advisor(chat_history: List[dict], context_data: dict) -> str:
+    """
+    Runs the AI Career Advisor using the chat history and context.
+    """
+    if not os.environ.get("NVIDIA_API_KEY"):
+        raise RuntimeError("Missing NVIDIA_API_KEY in .env")
+        
+    client = OpenAI(
+        base_url="https://integrate.api.nvidia.com/v1",
+        api_key=os.environ.get("NVIDIA_API_KEY"),
+        timeout=60.0
+    )
+    
+    # Format context
+    sys_prompt = "You are an AI Career Advisor helping a user navigate their global career and migration plan.\n\n"
+    sys_prompt += "Here is the context of their profile and recommendations (JSON):\n"
+    sys_prompt += json.dumps(context_data, indent=2) + "\n\n"
+    sys_prompt += "Use this context to answer their questions accurately and concisely. Be encouraging and strategic."
+    
+    messages = [{"role": "system", "content": sys_prompt}]
+    
+    for msg in chat_history:
+        messages.append({"role": msg["role"], "content": msg["content"]})
+        
+    try:
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=1024
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        logger.error("Error in run_chat_advisor: %s", str(e))
+        return "I apologize, but I'm currently unable to connect to the advisor service. Please try again later."

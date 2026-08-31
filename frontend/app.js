@@ -1,6 +1,6 @@
 // API configuration: Set this to your backend service URL (e.g., "https://agentbridge-backend.onrender.com") when deploying on static hosts like GitHub Pages
 // If left empty, it will default to relative URLs (useful for local development and Vercel deployments).
-const API_BASE = "https://agentbridge-multi-agent-global-career-2x7e.onrender.com";
+const API_BASE = "";
 
 document.addEventListener("DOMContentLoaded", () => {
     // Initialize Lucide Icons
@@ -319,6 +319,8 @@ document.addEventListener("DOMContentLoaded", () => {
             // 3. Transition to Results Dashboard
             loadingSection.classList.add("hidden");
             resultsDashboard.classList.remove("hidden");
+            const advisorWidget = document.getElementById("ai-advisor-widget");
+            if (advisorWidget) advisorWidget.classList.remove("hidden");
             
         } catch (error) {
             console.error(error);
@@ -359,6 +361,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Reset Dashboard
     newStrategyBtn.addEventListener("click", () => {
         resultsDashboard.classList.add("hidden");
+        const advisorWidget = document.getElementById("ai-advisor-widget");
+        if (advisorWidget) advisorWidget.classList.add("hidden");
         intakeSection.classList.remove("hidden");
         intakeForm.reset();
         currentData = null;
@@ -443,13 +447,25 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         `;
         
+        // Read simulator input fields
+        const budgetInput = document.getElementById("sim-budget");
+        const expInput = document.getElementById("sim-experience");
+        const scholInput = document.getElementById("sim-scholarship");
+        
+        let budget = budgetInput && budgetInput.value ? parseInt(budgetInput.value) : null;
+        let experience = expInput && expInput.value ? expInput.value : null;
+        let scholarship = scholInput ? scholInput.checked : false;
+
         try {
             const response = await fetch(`${API_BASE}/api/simulate`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     profile_data: currentData.profile,
-                    goals: document.getElementById("goals-text").value
+                    goals: document.getElementById("goals-text").value,
+                    budget: budget,
+                    experience_level: experience,
+                    require_scholarship: scholarship
                 })
             });
 
@@ -472,6 +488,13 @@ document.addEventListener("DOMContentLoaded", () => {
         } finally {
             isSimulating = false;
         }
+    }
+
+    const simRecalcBtn = document.getElementById("sim-recalculate-btn");
+    if (simRecalcBtn) {
+        simRecalcBtn.addEventListener("click", () => {
+            if (currentData) runScenarioSimulation();
+        });
     }
 
     // Render Simulation Cards
@@ -974,7 +997,23 @@ document.addEventListener("DOMContentLoaded", () => {
                         <span class="label">Risk Level</span>
                         <span class="badge ${riskClass}">${riskEmoji} ${country.risk_level || 'Low'}</span>
                     </div>
-                    <div class="risk-alert">
+                    ${country.positive_factors && country.positive_factors.length > 0 ? `
+                    <div class="explainability-section" style="margin-top:16px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.05);">
+                        <h4 style="font-size:11px; text-transform:uppercase; color:var(--success); margin:0 0 8px 0; display:flex; align-items:center; gap:4px;"><i data-lucide="thumbs-up" style="width:12px;height:12px;"></i> Why this country?</h4>
+                        <ul style="margin:0; padding-left:16px; font-size:12px; color:var(--text-secondary);">
+                            ${country.positive_factors.map(f => `<li>${f}</li>`).join('')}
+                        </ul>
+                    </div>
+                    ` : ''}
+                    ${country.drawbacks && country.drawbacks.length > 0 ? `
+                    <div class="explainability-section" style="margin-top:12px;">
+                        <h4 style="font-size:11px; text-transform:uppercase; color:var(--danger); margin:0 0 8px 0; display:flex; align-items:center; gap:4px;"><i data-lucide="thumbs-down" style="width:12px;height:12px;"></i> Drawbacks</h4>
+                        <ul style="margin:0; padding-left:16px; font-size:12px; color:var(--text-secondary);">
+                            ${country.drawbacks.map(f => `<li>${f}</li>`).join('')}
+                        </ul>
+                    </div>
+                    ` : ''}
+                    <div class="risk-alert" style="margin-top:16px;">
                         <span class="label"><i data-lucide="alert-triangle"></i> Strategic Risk Factors</span>
                         <p>${country.risk_analysis}</p>
                     </div>
@@ -1159,10 +1198,14 @@ document.addEventListener("DOMContentLoaded", () => {
                             </div>
                         </div>
                         <div class="step-card-right">
-                            <span class="outcomes-header">KEY OUTCOMES</span>
-                            <ul class="outcomes-list">
-                                ${item.outcomes.map(out => `<li>${out}</li>`).join("")}
-                            </ul>
+                            <span class="outcomes-header">KEY OUTCOMES & TASKS</span>
+                            <div class="outcomes-tasks" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+                                ${item.outcomes.map(out => `
+                                    <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--text-primary); cursor:pointer;">
+                                        <input type="checkbox" style="margin-top:3px; accent-color:var(--primary-color);"> 
+                                        <span style="line-height:1.4;">${out}</span>
+                                    </label>`).join("")}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1199,6 +1242,39 @@ document.addEventListener("DOMContentLoaded", () => {
             animateCurrencyCountUp("breakdown-remaining-cost", budgetPath.outOfPocket);
             
             document.getElementById("budget-explanation-text").textContent = budgetPath.explanation;
+
+            // Interactive Budget Planner Logic
+            const savingsInput = document.getElementById("current-savings");
+            const monthlyInput = document.getElementById("monthly-contribution");
+            const savingsResult = document.getElementById("savings-result");
+
+            const updateSavingsGoal = () => {
+                if (!savingsInput || !monthlyInput || !savingsResult) return;
+                
+                const targetCost = budgetPath.outOfPocket;
+                const currentSavings = parseInt(savingsInput.value) || 0;
+                const monthlyCont = parseInt(monthlyInput.value) || 0;
+                
+                if (currentSavings >= targetCost) {
+                    savingsResult.style.display = "block";
+                    savingsResult.style.color = "var(--success)";
+                    savingsResult.innerHTML = `You already have enough saved to cover the optimal path's out-of-pocket cost (${formatCurrency(targetCost)})!`;
+                } else if (monthlyCont > 0) {
+                    const remaining = targetCost - currentSavings;
+                    const months = Math.ceil(remaining / monthlyCont);
+                    savingsResult.style.display = "block";
+                    savingsResult.style.color = "var(--primary-color)";
+                    savingsResult.innerHTML = `At ${formatCurrency(monthlyCont, false, true)}, you will save the remaining ${formatCurrency(remaining)} in <strong>${months} months</strong> to afford the optimal path.`;
+                } else {
+                    savingsResult.style.display = "none";
+                }
+            };
+
+            if (savingsInput && monthlyInput) {
+                savingsInput.addEventListener("input", updateSavingsGoal);
+                monthlyInput.addEventListener("input", updateSavingsGoal);
+                updateSavingsGoal(); // initial calculation
+            }
         }
 
         // Set up AI Confidence Badge value
@@ -1282,4 +1358,108 @@ document.addEventListener("DOMContentLoaded", () => {
     if (metricsSection) {
         statsObserver.observe(metricsSection);
     }
+
+    // --- AI Career Advisor Chat Logic ---
+    const advisorWidget = document.getElementById("ai-advisor-widget");
+    const advisorHeader = document.getElementById("advisor-header-toggle");
+    const advisorBody = document.getElementById("advisor-body");
+    const advisorIcon = document.getElementById("advisor-toggle-icon");
+    const advisorMessages = document.getElementById("advisor-messages");
+    const advisorInput = document.getElementById("advisor-input");
+    const advisorSendBtn = document.getElementById("advisor-send-btn");
+
+    let chatHistory = [];
+    
+    // Toggle Advisor Chat Panel
+    if (advisorHeader) {
+        advisorHeader.addEventListener("click", () => {
+            const isHidden = advisorBody.style.display === "none";
+            advisorBody.style.display = isHidden ? "flex" : "none";
+            if (advisorIcon) advisorIcon.style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
+        });
+    }
+
+    async function sendChatMessage() {
+        if (!advisorInput || !advisorInput.value) return;
+        const text = advisorInput.value.trim();
+        if (!text || !currentData) return;
+        
+        // Add User message to UI
+        const userDiv = document.createElement("div");
+        userDiv.className = "advisor-message user";
+        userDiv.innerHTML = `<div class="message-content">${text}</div>`;
+        if (advisorMessages) advisorMessages.appendChild(userDiv);
+        
+        chatHistory.push({ role: "user", content: text });
+        advisorInput.value = "";
+        if (advisorMessages) advisorMessages.scrollTop = advisorMessages.scrollHeight;
+        if(advisorSendBtn) advisorSendBtn.disabled = true;
+
+        // Add loading indicator
+        const loadingDiv = document.createElement("div");
+        loadingDiv.className = "advisor-message system";
+        loadingDiv.id = "chat-loading";
+        loadingDiv.innerHTML = `<div class="message-content"><span class="spinner" style="width:14px;height:14px;border-width:2px;vertical-align:middle;display:inline-block;border-color:var(--primary-color);border-right-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></span></div>`;
+        if (advisorMessages) {
+            advisorMessages.appendChild(loadingDiv);
+            advisorMessages.scrollTop = advisorMessages.scrollHeight;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/api/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    chat_history: chatHistory.slice(-5), // Keep last 5 messages context
+                    context_data: {
+                        profile: currentData.profile,
+                        countries: currentData.explorer.matched_countries,
+                        funding: currentData.funding
+                    }
+                })
+            });
+
+            const loadingEl = document.getElementById("chat-loading");
+            if (loadingEl) loadingEl.remove();
+
+            if (!response.ok) throw new Error("Chat API failed");
+            const result = await response.json();
+            
+            chatHistory.push({ role: "assistant", content: result.response });
+
+            // Add Assistant message to UI
+            const aiDiv = document.createElement("div");
+            aiDiv.className = "advisor-message system";
+            let formattedText = result.response
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+            aiDiv.innerHTML = `<div class="message-content">${formattedText}</div>`;
+            if (advisorMessages) advisorMessages.appendChild(aiDiv);
+
+        } catch (error) {
+            console.error(error);
+            const loadingEl = document.getElementById("chat-loading");
+            if (loadingEl) loadingEl.remove();
+            
+            const errDiv = document.createElement("div");
+            errDiv.className = "advisor-message system";
+            errDiv.style.color = "var(--danger)";
+            errDiv.innerHTML = `<div class="message-content">Sorry, I couldn't process that right now. Please try again later.</div>`;
+            if (advisorMessages) advisorMessages.appendChild(errDiv);
+        } finally {
+            if(advisorSendBtn) advisorSendBtn.disabled = false;
+            if (advisorMessages) advisorMessages.scrollTop = advisorMessages.scrollHeight;
+            if(window.lucide) window.lucide.createIcons();
+        }
+    }
+
+    if (advisorSendBtn) {
+        advisorSendBtn.addEventListener("click", sendChatMessage);
+    }
+    if (advisorInput) {
+        advisorInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") sendChatMessage();
+        });
+    }
+
 });

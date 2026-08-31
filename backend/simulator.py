@@ -86,7 +86,7 @@ simulator_agent = Agent(
 # 4. Simulation Run Helper
 # ==========================================
 
-def get_simulator_fallback(profile_data: dict, goals: str) -> dict:
+def get_simulator_fallback(profile_data: dict, goals: str, budget: float = None, experience_level: str = None, require_scholarship: bool = False) -> dict:
     """
     Returns a calculated fallback simulation dataset if the LLM API fails or rate limits.
     """
@@ -180,7 +180,7 @@ def get_simulator_fallback(profile_data: dict, goals: str) -> dict:
             
     return {"scenarios": scenarios}
 
-def run_simulation(profile_data: dict, goals: str) -> dict:
+def run_simulation(profile_data: dict, goals: str, budget: float = None, experience_level: str = None, require_scholarship: bool = False) -> dict:
     """
     Runs the scenario simulator agent for the six countries.
     """
@@ -195,8 +195,14 @@ def run_simulation(profile_data: dict, goals: str) -> dict:
         f"Identified Skills: {', '.join(profile_data.get('skills_identified', []))}\n"
         f"Degree Level: {profile_data.get('degree_level')}\n"
         f"Employability Index: {profile_data.get('employability_index')}/10\n"
-        f"Goals & Budgets: {goals}"
+        f"Goals & Budgets: {goals}\n"
     )
+    if budget is not None:
+        message_text += f"Available Budget: ${budget} USD\n"
+    if experience_level:
+        message_text += f"Experience Level: {experience_level}\n"
+    if require_scholarship:
+        message_text += f"Requires Scholarship: Yes\n"
     
     sim_result = None
     for model in models_to_try:
@@ -247,7 +253,7 @@ def run_simulation(profile_data: dict, goals: str) -> dict:
                 
     if not sim_result:
         print(f"Scenario simulator agent failed: {str(last_error)}. Using fallback computation.")
-        sim_result = get_simulator_fallback(profile_data, goals)
+        sim_result = get_simulator_fallback(profile_data, goals, budget, experience_level, require_scholarship)
 
     # Apply data normalization layer on simulation result
     visa_complexity_map = {

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response
 from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
 
 # Add current folder to path
 sys.path.append(os.path.dirname(__file__))
@@ -35,9 +36,16 @@ class AnalysisRequest(BaseModel):
     goals: str
     degree_level: str
 
+class ChatRequest(BaseModel):
+    chat_history: List[Dict[str, str]]
+    context_data: Dict[str, Any]
+
 class SimulationRequest(BaseModel):
     profile_data: Dict[str, Any]
     goals: str
+    budget: Optional[float] = None
+    experience_level: Optional[str] = None
+    require_scholarship: Optional[bool] = False
 
 class ReportDownloadRequest(BaseModel):
     profile: Dict[str, Any]
@@ -66,13 +74,30 @@ async def analyze_profile(req: AnalysisRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {str(e)}")
+@app.post("/api/chat")
+async def chat_advisor(req: ChatRequest):
+    try:
+        response_text = await agents.run_chat_advisor(
+            chat_history=req.chat_history,
+            context_data=req.context_data
+        )
+        return {"response": response_text}
+    except Exception as e:
+        print(f"Error during chat advisor: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
 @app.post("/api/simulate")
 async def simulate_scenarios(req: SimulationRequest):
     try:
         print(f"Running scenario simulation for role: {req.profile_data.get('target_role')}")
         result = simulator.run_simulation(
             profile_data=req.profile_data,
-            goals=req.goals
+            goals=req.goals,
+            budget=req.budget,
+            experience_level=req.experience_level,
+            require_scholarship=req.require_scholarship
         )
         return result
     except Exception as e:

@@ -1291,6 +1291,29 @@
                                     <p>Interactive simulation comparing Stay in India vs Move to Japan, Germany, or
                                         Canada.</p>
                                 </div>
+                                <div class="simulator-controls" style="margin-bottom: 24px; padding: 20px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;">
+                                    <h4 style="margin-top: 0; margin-bottom: 16px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;"><i data-lucide="sliders" style="width: 18px; height: 18px;"></i> What-If Adjustments</h4>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                                        <div class="form-group" style="margin-bottom: 0;">
+                                            <label for="sim-budget">Max Budget (USD)</label>
+                                            <input type="number" id="sim-budget" placeholder="e.g. 15000">
+                                        </div>
+                                        <div class="form-group" style="margin-bottom: 0;">
+                                            <label for="sim-experience">Experience Level</label>
+                                            <select id="sim-experience">
+                                                <option value="">(No change)</option>
+                                                <option value="Entry Level (0-2 years)">Entry Level (0-2 years)</option>
+                                                <option value="Mid Level (3-5 years)">Mid Level (3-5 years)</option>
+                                                <option value="Senior Level (5+ years)">Senior Level (5+ years)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group" style="margin-bottom: 0; display: flex; align-items: center; gap: 8px; margin-top: 24px;">
+                                            <input type="checkbox" id="sim-scholarship" style="width: auto;">
+                                            <label for="sim-scholarship" style="margin-bottom: 0;">Require Scholarship</label>
+                                        </div>
+                                    </div>
+                                    <button id="sim-recalculate-btn" class="btn btn-primary" style="margin-top: 16px; padding: 10px 20px;">Recalculate Scenarios</button>
+                                </div>
                                 <div id="simulator-cards-container" class="simulator-comparison-grid">
                                     <!-- Replicate country cards for scenario simulation -->
                                     <div class="sim-editorial-card">
@@ -1447,6 +1470,30 @@
             </div>
 
         </main>
+    </div>
+
+    <!-- AI Career Advisor Floating Chat Widget -->
+    <div id="ai-advisor-widget" class="advisor-widget hidden">
+        <div class="advisor-header" id="advisor-header-toggle">
+            <div class="advisor-title">
+                <i data-lucide="message-square"></i>
+                <span>AI Career Advisor</span>
+            </div>
+            <i data-lucide="chevron-up" id="advisor-toggle-icon"></i>
+        </div>
+        <div class="advisor-body" id="advisor-body" style="display: none;">
+            <div class="advisor-messages" id="advisor-messages">
+                <div class="advisor-message system">
+                    <div class="message-content">Hello! I'm your AI Career Advisor. I have analyzed your blueprint. What questions do you have about your recommendations, countries, or next steps?</div>
+                </div>
+            </div>
+            <div class="advisor-input-area">
+                <input type="text" id="advisor-input" placeholder="Ask about your strategy..." autocomplete="off">
+                <button id="advisor-send-btn" class="btn-primary-small">
+                    <i data-lucide="send"></i>
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notifications Container -->
