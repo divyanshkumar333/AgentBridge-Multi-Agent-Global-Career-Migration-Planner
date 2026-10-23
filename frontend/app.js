@@ -1,6 +1,7 @@
-// API configuration: Set this to your backend service URL (e.g., "https://agentbridge-backend.onrender.com") when deploying on static hosts like GitHub Pages
-// If left empty, it will default to relative URLs (useful for local development and Vercel deployments).
-const API_BASE = "";
+// API configuration: defaults to Render backend in production/Vercel, relative path on localhost
+const API_BASE = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+    ? ""
+    : "https://agentbridge-multi-agent-global-career.onrender.com";
 
 document.addEventListener("DOMContentLoaded", () => {
     // Initialize Lucide Icons

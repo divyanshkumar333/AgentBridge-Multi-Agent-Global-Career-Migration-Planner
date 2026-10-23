@@ -307,7 +307,7 @@ get_scholarships_tool = FunctionTool(func=get_scholarships_db)
 # ==========================================
 
 # Model to use across agents
-MODEL_NAME = "meta/llama-3.2-90b-vision-instruct"
+MODEL_NAME = "minimaxai/minimax-m3.1-flash"
 
 # Agent 1: Profiler
 profiler_agent = Agent(
@@ -431,9 +431,9 @@ async def run_agent_pipeline(resume_text: str, goals: str, degree_level: str) ->
     client = OpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
         api_key=os.environ.get("NVIDIA_API_KEY"),
-        timeout=60.0
+        timeout=25.0
     )
-    logger.info("NVIDIA client initialized with 30s timeout")
+    logger.info("NVIDIA client initialized with 25s timeout")
 
     # Helper to execute a single agent run via Nvidia NIM with JSON schema enforcement, tools handling, and timeout
     async def execute_agent(agent, message_text: str):
@@ -487,7 +487,7 @@ async def run_agent_pipeline(resume_text: str, goals: str, degree_level: str) ->
                 f"with your final answer in the specified schema format."
             )
 
-        async def call_api_with_retry(messages, turn_num, attempt_limit=3):
+        async def call_api_with_retry(messages, turn_num, attempt_limit=2):
             last_err = None
             for attempt in range(attempt_limit):
                 try:
@@ -501,8 +501,9 @@ async def run_agent_pipeline(resume_text: str, goals: str, degree_level: str) ->
                     if tools_declarations:
                         kwargs["tools"] = tools_declarations
                     
+                    kwargs["timeout"] = 15.0
                     logger.info("Sending request to NVIDIA API for agent %s (turn %d, request attempt %d)", agent.name, turn_num, attempt + 1)
-                    completion = client.chat.completions.create(**kwargs)
+                    completion = await asyncio.to_thread(client.chat.completions.create, **kwargs)
                     return completion.choices[0].message
                 except Exception as api_err:
                     last_err = api_err
@@ -644,11 +645,11 @@ async def run_agent_pipeline(resume_text: str, goals: str, degree_level: str) ->
             
             raise ValueError(f"Agent {agent.name} reached maximum turns ({max_turns}) without producing a valid final response.")
 
-        # Apply 90‑second timeout for the entire sequence of turns
+        # Apply 30‑second timeout for the entire sequence of turns
         try:
-            return await asyncio.wait_for(call_agent(), timeout=90.0)
+            return await asyncio.wait_for(call_agent(), timeout=30.0)
         except asyncio.TimeoutError:
-            logger.error("Agent %s timed out after 90 seconds overall execution", agent.name)
+            logger.error("Agent %s timed out after 30 seconds overall execution", agent.name)
             raise
 
     # 2. Run Profiler Agent
@@ -909,7 +910,7 @@ async def run_agent_pipeline(resume_text: str, goals: str, degree_level: str) ->
             db_country = database.get_country(code)
             if db_country:
                 tuition = db_country.get("avg_tuition_annual_usd", 15000.0)
-                living = db_country.get("avg_living_monthly_usd", 1200.0)
+                living = db_country.get("avg_living_monthly_usd") or (db_country.get("avg_living_annual_usd", 14400.0) / 12)
                 total_1yr = tuition + 12 * living
                 salary = base_salary * salary_factors.get(code, 0.7)
                 
@@ -948,7 +949,7 @@ async def run_chat_advisor(chat_history: List[dict], context_data: dict) -> str:
     client = OpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
         api_key=os.environ.get("NVIDIA_API_KEY"),
-        timeout=60.0
+        timeout=25.0
     )
     
     # Format context
@@ -963,11 +964,13 @@ async def run_chat_advisor(chat_history: List[dict], context_data: dict) -> str:
         messages.append({"role": msg["role"], "content": msg["content"]})
         
     try:
-        completion = client.chat.completions.create(
+        completion = await asyncio.to_thread(
+            client.chat.completions.create,
             model=MODEL_NAME,
             messages=messages,
             temperature=0.7,
-            max_tokens=1024
+            max_tokens=1024,
+            timeout=15.0
         )
         return completion.choices[0].message.content
     except Exception as e:

@@ -58,7 +58,7 @@ get_simulator_countries_tool = FunctionTool(func=get_simulator_countries_db)
 # 3. Simulator Agent Definition
 # ==========================================
 
-MODEL_NAME = "meta/llama-3.2-90b-vision-instruct"
+MODEL_NAME = "minimaxai/minimax-m3.1-flash"
 
 simulator_agent = Agent(
     name="simulator_agent",
@@ -203,7 +203,7 @@ def run_simulation(profile_data: dict, goals: str, budget: float = None, experie
             client = OpenAI(
                 base_url="https://integrate.api.nvidia.com/v1",
                 api_key=os.environ.get("NVIDIA_API_KEY"),
-                timeout=60.0
+                timeout=25.0
             )
             schema_dict = SimulatorResult.model_json_schema()
             system_prompt = (
