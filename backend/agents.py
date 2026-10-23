@@ -21,10 +21,45 @@ if not logger.handlers:
 # Load env vars
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
-from google.adk import Agent
-from google.adk.tools import FunctionTool
-
 import database
+
+# Minimal stand-ins for google.adk Agent / FunctionTool — the real calls
+# go directly to NVIDIA NIM via the OpenAI client; we only need the
+# class scaffolding that ADK was providing.
+import inspect
+
+class FunctionTool:
+    """Wraps a plain Python function as a tool callable by the LLM loop."""
+    def __init__(self, func):
+        self.func = func
+        self.name = func.__name__
+        # Build a minimal declaration the existing execute_agent loop expects
+        self._decl = self
+        self.description = (inspect.getdoc(func) or self.name).splitlines()[0]
+        params = inspect.signature(func).parameters
+        self.parameters = {
+            "type": "object",
+            "properties": {p: {"type": "string"} for p in params},
+            "required": [p for p, v in params.items() if v.default is inspect.Parameter.empty]
+        }
+
+    def _get_declaration(self):
+        return self
+
+    async def run_async(self, args: dict, tool_context=None):
+        """Call the wrapped function (sync) from async context."""
+        result = self.func(**args)
+        return result
+
+
+class Agent:
+    """Thin data-holder replacing google.adk.Agent."""
+    def __init__(self, name, instruction, model, output_schema, tools=None):
+        self.name = name
+        self.instruction = instruction
+        self.model = model
+        self.output_schema = output_schema
+        self.tools = tools or []
 
 # ==========================================
 # 1. Security Feature: PII Redaction Guard
@@ -560,13 +595,9 @@ async def run_agent_pipeline(resume_text: str, goals: str, degree_level: str) ->
                             
                         if tc_name in tools_map:
                             tool_obj = tools_map[tc_name]
-                            from google.adk.tools.tool_context import ToolContext
-                            class DummyToolContext(ToolContext):
-                                def __init__(self): pass
-                                def request_confirmation(self, hint: str): pass
                             
                             try:
-                                tool_res = await tool_obj.run_async(args=tc_args, tool_context=DummyToolContext())
+                                tool_res = await tool_obj.run_async(args=tc_args)
                                 tool_content = json.dumps(tool_res)
                             except Exception as tool_err:
                                 tool_content = json.dumps({"error": f"Tool execution failed: {str(tool_err)}"})
