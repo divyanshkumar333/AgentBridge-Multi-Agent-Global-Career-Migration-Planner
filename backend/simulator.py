@@ -1,20 +1,17 @@
 import os
 import json
 import time
-from typing import List
+import asyncio
+from typing import List, Optional
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from openai import OpenAI
 
 # Load env vars
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
-from google.adk import Agent, Runner
-from google.adk.sessions import InMemorySessionService
-from google.adk.tools import FunctionTool
-from google.genai import types
-
 import database
-from agents import resolve_country_code
+from agents import resolve_country_code, FunctionTool, Agent, normalize_llm_json, parse_nested_json_strings
 
 # ==========================================
 # 1. Pydantic Output Schemas
@@ -61,7 +58,7 @@ get_simulator_countries_tool = FunctionTool(func=get_simulator_countries_db)
 # 3. Simulator Agent Definition
 # ==========================================
 
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "meta/llama-3.2-90b-vision-instruct"
 
 simulator_agent = Agent(
     name="simulator_agent",
@@ -182,14 +179,9 @@ def get_simulator_fallback(profile_data: dict, goals: str, budget: float = None,
 
 def run_simulation(profile_data: dict, goals: str, budget: float = None, experience_level: str = None, require_scholarship: bool = False) -> dict:
     """
-    Runs the scenario simulator agent for the six countries.
+    Runs the scenario simulator using NVIDIA NIM directly (same approach as agents.py).
+    Falls back to database-computed values if the LLM fails.
     """
-    session_service = InMemorySessionService()
-    
-    # Cascade model list to bypass rate limits
-    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
-    last_error = None
-    
     message_text = (
         f"Candidate Target Role: {profile_data.get('target_role')}\n"
         f"Identified Skills: {', '.join(profile_data.get('skills_identified', []))}\n"
@@ -203,57 +195,46 @@ def run_simulation(profile_data: dict, goals: str, budget: float = None, experie
         message_text += f"Experience Level: {experience_level}\n"
     if require_scholarship:
         message_text += f"Requires Scholarship: Yes\n"
-    
+
     sim_result = None
-    for model in models_to_try:
-        simulator_agent.model = model
-        max_attempts = 2
-        base_delay = 3.0
-        
-        for attempt in range(max_attempts):
-            try:
-                runner = Runner(agent=simulator_agent, session_service=session_service, app_name="agentbridge", auto_create_session=True)
-                generator = runner.run(
-                    user_id="pipeline_user",
-                    session_id="simulator_session",
-                    new_message=types.Content(
-                        role="user",
-                        parts=[types.Part.from_text(text=message_text)]
-                    )
-                )
-                response_text = ""
-                for event in generator:
-                    if hasattr(event, "error_code") and event.error_code:
-                        err_msg = str(event.error_message)
-                        if "RESOURCE_EXHAUSTED" in err_msg or "503" in err_msg or "quota" in err_msg.lower():
-                            raise RuntimeError(f"FallbackTrigger: {err_msg}")
-                        raise RuntimeError(f"Agent yielded error: {event.error_code} - {err_msg}")
-                    if event.content and event.content.parts:
-                        response_text = event.content.parts[0].text
-                if not response_text:
-                    raise RuntimeError("Agent returned empty response")
-                sim_result = json.loads(response_text)
-                break
-            except Exception as e:
-                last_error = e
-                err_msg = str(e).lower()
-                if "resource_exhausted" in err_msg or "429" in err_msg or "quota" in err_msg or "503" in err_msg or "unavailable" in err_msg or "fallbacktrigger" in err_msg:
-                    print(f"[simulator_agent] Model {model} hit rate limit. Sleeping 8s before switching...")
-                    time.sleep(8)
-                    break
-                
-                if attempt == max_attempts - 1:
-                    break
-                    
-                delay = base_delay * (2 ** attempt)
-                print(f"[simulator_agent] Attempt {attempt + 1} with model {model} failed: {str(e)}. Retrying in {delay}s...")
-                time.sleep(delay)
-        if sim_result:
-            break
-                
+
+    if os.environ.get("NVIDIA_API_KEY"):
+        try:
+            client = OpenAI(
+                base_url="https://integrate.api.nvidia.com/v1",
+                api_key=os.environ.get("NVIDIA_API_KEY"),
+                timeout=60.0
+            )
+            schema_dict = SimulatorResult.model_json_schema()
+            system_prompt = (
+                f"{simulator_agent.instruction}\n\n"
+                f"You MUST output your response strictly as a JSON object conforming to this schema:\n"
+                f"{json.dumps(schema_dict, indent=2)}\n\n"
+                f"Do not include any explanation, markdown wrapping (such as ```json), or preamble. "
+                f"Output only raw, valid JSON."
+            )
+            completion = client.chat.completions.create(
+                model=simulator_agent.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": message_text}
+                ],
+                temperature=0.2,
+                top_p=0.7,
+                max_tokens=2048
+            )
+            raw = completion.choices[0].message.content or ""
+            clean = normalize_llm_json(raw)
+            parsed = json.loads(clean)
+            parsed = parse_nested_json_strings(parsed)
+            validated = SimulatorResult.model_validate(parsed)
+            sim_result = json.loads(validated.model_dump_json())
+        except Exception as e:
+            print(f"Scenario simulator LLM call failed: {str(e)}. Using fallback computation.")
+
     if not sim_result:
-        print(f"Scenario simulator agent failed: {str(last_error)}. Using fallback computation.")
         sim_result = get_simulator_fallback(profile_data, goals, budget, experience_level, require_scholarship)
+
 
     # Apply data normalization layer on simulation result
     visa_complexity_map = {
